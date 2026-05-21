@@ -1,0 +1,15 @@
+{
+  "/api": {
+    "target": "http://localhost:7071",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info"
+  },
+  "/api/reports": {
+    "target": "http://localhost:7072",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info",
+    "pathRewrite": { "^/api/reports": "/api/reports" }
+  }
+}
