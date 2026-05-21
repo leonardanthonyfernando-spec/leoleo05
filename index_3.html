@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OPR – IRMT 2.0 | Accenture</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!--
+═══════════════════════════════════════════════════════════════════════════════
+  OPR – IRMT 2.0  ·  PRA Module User Stories (from OPR_-_Not_Yet_Estimated.xlsx)
+═══════════════════════════════════════════════════════════════════════════════
+
+  PRA HEADER
+  ───────────────────────────────────────────────────────────────────────────
+  7.1 Display 'Portfolio Risk (O-IDRA)' on left pane
+      AC: Visible, distinct, keyboard-accessible, screen-reader announced.
+  7.2 Show Filters
+      AC: Quick filter pills (Show, Portfolio, Revenue Range) update reports
+          immediately; persist while window open; loading indicators + a11y.
+  7.3 Show | Quarterly (single-select)
+      AC: Values = Last 12 Months, Quarterly (default), FYTD. Filter ONLY
+          applies to Risk Score Trend chart; other charts use current data.
+  7.4 Show | Portfolio filters dropdown (dynamic)
+      AC: Values = Portfolio (default), Market, RDE. Dynamic per left-pane
+          selection. Single-select; updates all charts immediately.
+  7.5 Show | Revenue Range Filter Dropdown
+      AC: Default >$1M. Dynamic max from dataset. Chart updates on blur.
+  7.6 Filter Icon
+      AC: 'My Portfolio Filter' hover label; clears all filters / refreshes.
+
+  MY PORTFOLIO FILTER PANEL
+  ───────────────────────────────────────────────────────────────────────────
+  8.1  Title 'My Portfolio Filter' shown as header when filter icon clicked
+  8.2  Select Portfolio dropdown (saved portfolios, else greyed placeholder)
+  8.3  Reset action ('Reset Data' hover label)
+  8.4  Won Deals / Pipeline radio (mutually exclusive)
+  8.5  Won Deals → MMS data source; Pipeline → IRMT2.0/IDRA data source
+  8.6  Opportunity Stage (0A, 1, 2A, 2B, 3A, 3B, 3C) — Pipeline only
+  8.7  IDRA Risk Tier (High, Above Normal, Normal — all default selected)
+  8.8  Win Probability (ALL, <10%, ≥10%, ≥25%, ≥50%, ≥75%) — Pipeline only
+  8.9  Display Options · Revenue-Weighted Risk toggle
+  8.10 Display Options · View Risky Deals by Top Deals (All / 25 / 50 / 100)
+  8.12 Apply (enabled only when criteria selected; closes modal)
+  8.13 Cancel (always enabled; discards changes)
+  8.14 Clear (enabled only when criteria selected; resets but stays open)
+
+  INCLUSION CRITERIA
+  ───────────────────────────────────────────────────────────────────────────
+  5.1  PRA Inclusion Criteria — Portfolio selection rules driven by left-pane
+       scope (Market/MU/RDE/CG breakdown logic).
+
+  RISK SCORE TREND
+  ───────────────────────────────────────────────────────────────────────────
+  9.1  Trend Lines · x-axis scale 1–5, two primary views (Won/Pipeline);
+       Weighted Avg formula = SUM(IDRA Risk Score × Total Revenue)/SUM(Total
+       Revenue). Label updates to "Risk Score Trend Weighted by Revenue".
+       Last data point shaded grey (current in-progress timeline).
+  9.2  MU Level · Portfolio trend = light purple secondary; selected MU =
+       dark purple primary; other MUs greyed in background. Click to swap.
+  9.3  Comparison Trend Line · "Global Risk Score" (America's level) or
+       "Market Risk Score" (MU level).
+  9.4  Mouse over · tooltip shows actual value + report icon.
+  9.5  Click data point · expands point + all supporting charts and the
+       Top 10 list update to historical data from that point.
+
+  RISK TIER DISTRIBUTION
+  ───────────────────────────────────────────────────────────────────────────
+  10.1 Default — High/Above Normal counts; title reflects selected tiers;
+       primary trend line's matching bar highlighted.
+  10.2 MU Level — UKIA bar highlighted when UKIA selected as primary.
+
+  RISK TIER BY REVENUE
+  ───────────────────────────────────────────────────────────────────────────
+  11.1 Default — percentage + revenue per tier; centre shows total revenue
+       with dynamic B/M unit; title reflects selected tiers.
+  11.2 MU Level — values for selected MU; title updated (e.g. "UKIA MU").
+
+  HIGH RISK TIER BY CLIENT CLASSIFICATION
+  ───────────────────────────────────────────────────────────────────────────
+  12.1 Default — ONLY High tier (even if other tiers selected); centre
+       shows total revenue with dynamic B/M unit.
+  12.2 MU Level — values reflect selected MU.
+
+  RISKY DEALS SCATTERPLOT
+  ───────────────────────────────────────────────────────────────────────────
+  13.1 Default — x: Total Revenue, y: IDRA Risk Score; legend = Opportunity,
+       Opp w/ active QA, Average Risk Score & Revenue.
+  13.2 Average Trend Line — average IDRA Risk Score and Total Revenue.
+  13.3 Data Box · Avg IDRA Risk Score, Total Revenue, # of Opp, # of Opp w/
+       finalised QA, Total SC%, Total CCI%.
+  13.4 Mouse over · CR Name, Opp Name, IDRA Risk Score & Tier, IDRA Link,
+       Total Revenue, Suggested SC%, SC%, CCI%. Historical view → "IDRA Link
+       View (Current View)".
+
+  REPORT COLUMNS LIST  (Story 14.1) — used in the drill-down screen below
+  ───────────────────────────────────────────────────────────────────────────
+  Required order:
+    • Flag
+    • Customer Relationship Name (Restricted)
+    • Opportunity Name (Restricted)
+    • Opportunity ID
+    • Appropriate Stage
+    • Expected Contract Sign Date
+    • IDRA Calculated Risk Tier
+    • IDRA Calculated Risk Score
+    Financials  (expand/collapse sub-section):
+    • Total Current Revenue ($k)
+    • QAD  (greyed if QA inactive)
+    Demographics  (expand/collapse sub-section):
+    • Market · MU · RDE · SG
+═══════════════════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root{
+    --purple:#A100FF; --purple-d:#7500B8; --purple-mid:#C566FF; --purple-l:#E8C5FF; --purple-xl:#F5E5FF;
+    --bg:#F4F5F7; --card:#FFFFFF; --border:#E5E7EB; --border-l:#F0F1F4;
+    --ink:#0B0B1A; --ink-2:#3D3D5C; --ink-3:#6B6B85; --ink-4:#9A9AB3;
+    --footer:#0A0A14; --footer-text:#9C9CB3;
+    --r-high:#A100FF; --r-an:#C97AFF; --r-norm:#E8C5FF;
+    --tier-red:#E74C3C; --tier-amber:#F39C12; --tier-green:#27AE60;
+    --shadow:0 1px 2px rgba(11,11,26,.04),0 1px 3px rgba(11,11,26,.06);
+    --shadow-md:0 2px 4px rgba(11,11,26,.06),0 4px 8px rgba(11,11,26,.05);
+    --shadow-lg:0 10px 30px rgba(11,11,26,.12);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased;line-height:1.45}
+  #root{min-height:100vh;display:flex;flex-direction:column}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  input,select,textarea{font-family:inherit;font-size:inherit}
+
+  /* HEADER */
+  .hdr{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:100}
+  .hdr-l{display:flex;align-items:center;gap:14px}
+  .acn-chev{color:var(--purple);font-size:24px;font-weight:900;line-height:1;transform:translateY(-1px)}
+  .hdr-title{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .hdr-r{display:flex;align-items:center;gap:8px}
+  .view-toggle{display:flex;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px;height:34px}
+  .vt-btn{padding:0 16px;border-radius:18px;font-size:12px;font-weight:600;color:var(--ink-2);display:flex;align-items:center;background:transparent}
+  .vt-btn.active{background:var(--purple);color:#fff}
+  .vt-btn:hover:not(.active){color:var(--ink)}
+  .hdr-icon{width:34px;height:34px;border-radius:50%;color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+  .hdr-icon:hover{background:var(--bg);color:var(--purple)}
+  .hdr-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#9F7AEA,#7500B8);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:11px}
+
+  /* PAGE */
+  .page{flex:1;padding:18px 28px 28px;max-width:1480px;width:100%;margin:0 auto;align-self:center}
+
+  /* BREADCRUMB */
+  .crumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);margin-bottom:14px}
+  .crumb a{color:var(--ink-3);text-decoration:none}
+  .crumb a:hover{color:var(--purple);text-decoration:underline;cursor:pointer}
+  .crumb-sep{color:var(--ink-4)}
+  .crumb-current{color:var(--ink);font-weight:600}
+
+  .page-hdr{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:16px;flex-wrap:wrap}
+  .page-title{font-size:22px;font-weight:700;margin:0;letter-spacing:-.02em;color:var(--ink)}
+
+  /* Hide charts toggle */
+  .hc-toggle{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-2);font-weight:500}
+  .switch{position:relative;width:36px;height:20px;background:#D1D5DB;border-radius:10px;cursor:pointer;transition:background .2s}
+  .switch.on{background:var(--purple)}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch.on::after{transform:translateX(16px)}
+
+  /* FILTER BAR (PRA dashboard) */
+  .filt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .filt-lbl{font-size:12px;color:var(--ink-3);font-weight:500}
+  .filt-pill{height:34px;padding:0 14px;border:1px solid var(--border);background:#fff;border-radius:20px;font-size:12px;color:var(--ink);display:flex;align-items:center;gap:8px;font-weight:500;white-space:nowrap}
+  .filt-pill:hover{border-color:var(--purple)}
+  .filt-pill svg{color:var(--ink-3)}
+  .filt-icon-btn{width:34px;height:34px;border-radius:50%;background:var(--purple);color:#fff;display:flex;align-items:center;justify-content:center}
+  .filt-icon-btn:hover{background:var(--purple-d)}
+
+  /* CARDS GRID */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:18px}
+  .card{background:var(--card);border:2px solid var(--border);border-radius:10px;padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;transition:border-color .15s;cursor:pointer}
+  .card:hover{border-color:var(--purple-l)}
+  .card.selected{border-color:var(--purple);box-shadow:0 0 0 1px var(--purple),var(--shadow-md)}
+  .card.compact{padding:14px 16px;gap:8px;min-height:220px}
+  .card-title{font-size:13px;font-weight:700;color:var(--purple);margin:0;letter-spacing:-.005em}
+  .card-sub{font-size:11px;color:var(--ink-3);margin:-8px 0 0}
+  .y-axis-label{font-size:10px;color:var(--ink-3);font-weight:500;margin-bottom:-6px}
+
+  /* LINE CHART */
+  .chart-svg{width:100%;height:auto;overflow:visible}
+  .chart-legend{display:flex;justify-content:center;gap:18px;font-size:11px;color:var(--ink-2);margin-top:6px;flex-wrap:wrap}
+  .leg-item{display:flex;align-items:center;gap:6px}
+  .leg-dot{width:10px;height:10px;border-radius:50%}
+  .leg-line{width:14px;height:2px;border-radius:1px}
+  .gridline{stroke:var(--border-l);stroke-width:1}
+  .axis-text{font-size:9.5px;fill:var(--ink-3);font-family:'Inter',sans-serif}
+
+  /* SCATTER */
+  .scatter-row{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;align-items:stretch}
+  .stats-pane{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:6px 0 6px 14px;border-left:1px solid var(--border-l)}
+  .stat-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 0;font-size:11.5px}
+  .stat-label{color:var(--ink-2);display:flex;align-items:center;gap:5px}
+  .stat-info{width:13px;height:13px;border-radius:50%;background:var(--purple);color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+  .stat-value{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  /* HORIZONTAL BARS */
+  .hbar-rows{display:flex;flex-direction:column;gap:14px;padding:6px 0}
+  .hbar-row{display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:center;font-size:11px}
+  .hbar-label{color:var(--ink-2);text-align:right;font-weight:500}
+  .hbar-track{position:relative;height:18px;background:var(--bg);border-radius:3px;overflow:visible}
+  .hbar-fill{height:100%;border-radius:3px;background:var(--purple)}
+  .hbar-meta{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);font-size:10.5px;font-weight:700;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .hbar-axis{display:grid;grid-template-columns:80px 1fr;gap:12px;font-size:9px;color:var(--ink-3);padding-top:4px}
+  .hbar-axis-ticks{display:flex;justify-content:space-between}
+  .hbar-totals{display:flex;justify-content:center;gap:32px;padding-top:14px;border-top:1px solid var(--border-l);margin-top:6px}
+  .ttl-num{font-size:16px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .ttl-lbl{font-size:9.5px;color:var(--ink-3);display:block;margin-top:2px}
+
+  /* STACKED BAR */
+  .sb-row{display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:center}
+  .sb-track{height:32px;display:flex;border-radius:3px;overflow:hidden;position:relative}
+  .sb-seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;height:100%}
+  .sb-total{position:absolute;right:-58px;top:50%;transform:translateY(-50%);font-weight:700;font-size:12px;font-variant-numeric:tabular-nums}
+
+  /* DRILL-DOWN HEADER */
+  .dd-hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+  .dd-title{font-size:18px;font-weight:700;margin:0;color:var(--ink)}
+  .dd-stats{display:flex;gap:16px;font-size:12px;color:var(--ink-2);margin-top:6px}
+  .dd-stats strong{color:var(--ink);font-weight:700}
+  .dd-actions{display:flex;align-items:center;gap:8px}
+  .dd-search{position:relative;width:240px}
+  .dd-search input{width:100%;height:34px;padding:0 12px 0 36px;border:1px solid var(--border);border-radius:20px;font-size:12px;background:#fff}
+  .dd-search input:focus{outline:none;border-color:var(--purple)}
+  .dd-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+  .icon-btn{width:34px;height:34px;border:1px solid var(--border);border-radius:50%;background:#fff;color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+  .icon-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+  /* DATA TABLE (drill-down) */
+  .dd-table-wrap{background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);position:relative}
+  .dd-table-scroll{overflow-x:auto;max-height:620px}
+  table.dd-table{width:100%;border-collapse:collapse;min-width:1200px;font-size:12.5px}
+  table.dd-table thead{background:#fff;position:sticky;top:0;z-index:5}
+  table.dd-table th{text-align:left;padding:14px 12px;font-size:10.5px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--border);white-space:nowrap;letter-spacing:.02em;background:#FAFAFB;position:relative;text-transform:none}
+  table.dd-table th.center{text-align:center}
+  table.dd-table th:after{content:'';position:absolute;right:0;top:25%;height:50%;width:1px;background:var(--border-l)}
+  table.dd-table th:last-child:after{display:none}
+  table.dd-table td{padding:14px 12px;font-size:12.5px;border-bottom:1px solid var(--border-l);white-space:nowrap;color:var(--ink)}
+  table.dd-table tbody tr{cursor:pointer;transition:background .1s}
+  table.dd-table tbody tr:hover{background:#FAF5FF}
+  .truncate{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block}
+  .col-flag{width:36px;text-align:center}
+  .col-tier{width:60px;text-align:center}
+  .col-score{width:80px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+  .col-rev{width:120px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  .flag-icon{color:var(--purple);font-size:14px}
+  .flag-icon.inactive{color:transparent}
+  .tier-circle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-size:10px;font-weight:700}
+  .tier-h{background:var(--tier-red)} .tier-a{background:var(--tier-amber)} .tier-n{background:var(--tier-green)}
+  .tier-action{margin-left:6px;color:var(--ink-3);cursor:pointer}
+  .qad-inactive{color:var(--ink-4);text-decoration:line-through}
+
+  /* FINANCIALS vertical side label */
+  .fin-side{position:absolute;right:0;top:46px;bottom:78px;width:30px;background:linear-gradient(180deg,var(--purple),var(--purple-d));display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;letter-spacing:.4em;writing-mode:vertical-rl;transform:rotate(180deg);border-top-left-radius:8px;border-bottom-left-radius:8px;pointer-events:none}
+
+  /* PAGINATION (Figma style) */
+  .pgn-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);background:#FAFAFB;font-size:12px;flex-wrap:wrap;gap:10px}
+  .pgn-left{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
+  .pgn-sel{height:30px;padding:0 8px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12px}
+  .pgn-mid{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
+  .pgn-ctrls{display:flex;gap:4px;align-items:center}
+  .pgn-btn{width:30px;height:30px;border:1px solid transparent;background:transparent;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--ink-2);font-weight:500}
+  .pgn-btn:hover{background:var(--bg);color:var(--ink)}
+  .pgn-btn.active{background:var(--purple);color:#fff;border-color:var(--purple)}
+  .pgn-btn:disabled{opacity:.4;cursor:not-allowed}
+  .pgn-ellip{padding:0 4px;color:var(--ink-3)}
+
+  /* OPERATIONAL VIEWS (re-used) */
+  .sec{margin-bottom:24px}
+  .sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer}
+  .sec-arrow{transition:transform .15s;color:var(--ink-2)}
+  .sec-arrow.open{transform:rotate(90deg)}
+  .sec-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+  .sec-count{background:var(--purple-xl);color:var(--purple-d);font-size:11px;padding:1px 8px;border-radius:10px;font-weight:700}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .tile{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px 18px;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:130px;position:relative;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s,border-color .15s}
+  .tile:hover{border-color:var(--purple);box-shadow:var(--shadow-md);transform:translateY(-1px)}
+  .tile.fav{border-left:3px solid var(--purple)}
+  .tile-top{display:flex;align-items:center;gap:8px}
+  .tile-star{width:22px;height:22px;color:var(--ink-4);padding:0;display:flex;align-items:center;justify-content:center}
+  .tile-star.on{color:var(--purple)}
+  .tile-name{font-size:13.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badges{display:flex;gap:6px;flex-wrap:wrap}
+  .bdg{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em}
+  .bdg-new{background:#DCFCE7;color:#15803D}
+  .bdg-shared{background:#DBEAFE;color:#1D4ED8}
+  .bdg-lock{background:#FEF3C7;color:#92400E;display:flex;align-items:center;gap:3px}
+  .tile-desc{font-size:12px;color:var(--ink-2);margin:0;line-height:1.45}
+  .tile-mtr{display:flex;gap:16px;padding:10px 0;border-top:1px solid var(--border-l);border-bottom:1px solid var(--border-l)}
+  .mtr{display:flex;flex-direction:column;gap:1px}
+  .mtr-v{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+  .mtr-l{font-size:9.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+  .tile-chart-area{flex:1;display:flex;align-items:center;justify-content:center;min-height:60px}
+  .tile-chart-area svg{width:100%;max-height:75px}
+  .tile-foot{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--ink-3)}
+
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+  .search-wrap{position:relative;flex:1;min-width:240px;max-width:380px}
+  .search-wrap input{width:100%;height:36px;padding:0 14px 0 38px;border:1px solid var(--border);border-radius:20px;font-size:12.5px;background:#fff}
+  .search-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+  .btn{height:36px;padding:0 16px;border:1px solid var(--border);background:#fff;border-radius:20px;font-size:12.5px;color:var(--ink);display:inline-flex;align-items:center;gap:6px;font-weight:500}
+  .btn:hover{border-color:var(--purple);color:var(--purple)}
+  .btn-primary{background:var(--purple);color:#fff;border-color:var(--purple)}
+  .btn-primary:hover{background:var(--purple-d);color:#fff}
+
+  /* MODAL (Manage Opportunity – kept from before) */
+  .modal-bd{position:fixed;inset:0;background:rgba(11,11,26,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:960px;height:90vh;max-height:880px;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden}
+  .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:22px 30px 18px;border-bottom:1px solid var(--border)}
+  .modal-title{font-size:18px;font-weight:700;margin:0 0 4px}
+  .modal-sub{font-size:12.5px;color:var(--ink-2)}
+  .modal-x{width:32px;height:32px;border-radius:8px;color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+  .modal-x:hover{background:var(--bg);color:var(--ink)}
+  .modal-tabs{display:flex;padding:0 30px;border-bottom:1px solid var(--border)}
+  .modal-tab{padding:13px 18px;border-bottom:2px solid transparent;font-size:12.5px;color:var(--ink-2);font-weight:500;margin-bottom:-1px}
+  .modal-tab.active{color:var(--purple);border-bottom-color:var(--purple);font-weight:700}
+  .modal-body{flex:1;overflow-y:auto;padding:24px 30px}
+  .sec-h{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border-l)}
+  .ov-block{margin-bottom:24px}
+  .ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px 28px}
+  .ov-i{display:flex;flex-direction:column;gap:3px}
+  .ov-l{font-size:10.5px;font-weight:600;color:var(--ink-3);text-transform:uppercase}
+  .ov-v{font-size:13px}
+  .ov-v.fin{font-weight:700;font-variant-numeric:tabular-nums}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .form-row.full{grid-template-columns:1fr}
+  .form-lbl{display:block;font-size:11.5px;font-weight:600;margin-bottom:6px;color:var(--ink-2)}
+  .form-sel,.form-txt{width:100%;border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:13px;background:#fff}
+  .form-txt{resize:vertical;min-height:80px}
+  .form-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid var(--border-l)}
+  .qad-card{background:linear-gradient(135deg,var(--purple-xl),#fff);border:1px solid var(--purple-l);border-radius:10px;padding:16px 20px;margin-bottom:20px}
+  .qad-name{font-size:17px;font-weight:700;margin:0 0 4px}
+  .qad-meta{font-size:12px;color:var(--ink-2)}
+  .qad-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+
+  /* FOOTER */
+  .ftr{background:var(--footer);color:var(--footer-text);padding:18px 28px;font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;flex-shrink:0}
+  .ftr-l{display:flex;align-items:center;gap:10px;max-width:660px;line-height:1.5}
+  .ftr-l svg{flex-shrink:0;color:#666690}
+  .ftr-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+  .ftr-links{display:flex;gap:18px}
+  .ftr-links a{color:var(--footer-text);text-decoration:none}
+  .ftr-links a:hover{color:#fff;text-decoration:underline}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:8px;font-size:12.5px;z-index:2000;box-shadow:var(--shadow-lg);font-weight:500}
+
+  /* MY PORTFOLIO FILTER PANEL (Stories 8.1–8.14) */
+  .mpf-panel{position:fixed;top:0;right:-440px;width:440px;height:100vh;background:#fff;border-left:1px solid var(--border);box-shadow:-4px 0 24px rgba(0,0,0,.12);display:flex;flex-direction:column;transition:right .25s ease;z-index:900}
+  .mpf-panel.open{right:0}
+  .mpf-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--purple);color:#fff}
+  .mpf-title{font-size:15px;font-weight:700;margin:0}
+  .mpf-body{flex:1;overflow-y:auto;padding:20px 24px}
+  .mpf-grp{margin-bottom:22px}
+  .mpf-grp-h{font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border-l)}
+  .mpf-fld{margin-bottom:14px}
+  .mpf-lbl{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+  .mpf-sel{width:100%;height:34px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:#fff}
+  .radio-row{display:flex;gap:14px;font-size:12.5px}
+  .radio-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .mpf-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:#FAFAFB}
+
+  @media(max-width:1100px){.grid-2,.grid-3{grid-template-columns:1fr}.scatter-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+// ── PRA Chart Data ──────────────────────────────────────────
+const PORTFOLIO_KPI = { avgRisk:2.6, totalRev:"$33.44B", numOpps:6477, scPct:"7%", ccPct:"28%" };
+
+const TREND_DATA = [
+  { m:"Apr-21", port:2.1, mu:1.9 },{ m:"May-21", port:2.5, mu:2.3 },{ m:"Jun-21", port:2.3, mu:2.2 },
+  { m:"Jul-21", port:2.6, mu:2.5 },{ m:"Aug-21", port:2.4, mu:2.4 },{ m:"Sep-21", port:2.5, mu:2.3 },
+  { m:"Oct-21", port:2.3, mu:2.1 },{ m:"Nov-21", port:1.9, mu:1.8 },{ m:"Dec-21", port:2.1, mu:2.0 },
+  { m:"Jan-22", port:2.2, mu:2.1 },{ m:"Feb-22", port:2.7, mu:2.5 },{ m:"Mar-22", port:1.7, mu:1.6 }
+];
+const SCATTER_DATA = Array.from({length:64},(_,i)=>{
+  const seed = (i*9301+49297)%233280; const r = seed/233280;
+  const x = 800 + r*2400; const y = 4.2 - (x/3500)*2 + (((i*73)%100)/100-0.5)*1.5;
+  return { x:Math.round(x), y:Math.max(0.2,Math.min(4.5,y)), withQA:i%3===0 };
+});
+const RISK_TIER_REV = [
+  { l:"High", count:6265, rev:"$32M", pct:1.0 },
+  { l:"Above Normal", count:3418, rev:"$10M", pct:0.55 },
+  { l:"Normal", count:3412, rev:"$7M", pct:0.55 }
+];
+const DIST_DATA = [
+  { l:"Normal", v:3412, color:"var(--r-norm)" },
+  { l:"Above Normal", v:3418, color:"var(--r-an)" },
+  { l:"High", v:2926, color:"var(--r-high)" }
+];
+const CLIENT_CLASS = [
+  { l:"Diamond", count:8976, rev:"$248M", pct:1.0 },
+  { l:"Opportunistic", count:5345, rev:"$12M", pct:0.59 },
+  { l:"Portfolio", count:1245, rev:"$5M", pct:0.14 },
+  { l:"Foundation", count:6435, rev:"$30M", pct:0.72 }
+];
+
+// ── Drill-Down opportunity data (Story 14.1 column list) ────
+const CR_NAMES = ["Nisource (Utilities)","Apex Strategic Partnership","BlueWave Enterprise Account","Summit Key Relationship","Orion Preferred Client","NovaTech Corporate Engage…","PrimeLink Business Relations…","EliteEdge Strategic Account","Sterling Value Client","Titan Strategic Alliance","GoldenBridge Key Account","Quantum Enterprise Partners…","Silverline Corporate Relations…","Falcon Premier Engagement","Evergreen Long-Term Alliance","Aurora Business Partnership","Crescent Banking Group","Helios Capital Markets","Meridian Industrial Co","Pegasus Health Network","Sapphire Telecom Holdings","Vega Energy Services","Quasar Manufacturing","Polaris Retail Solutions","Cygnus Distribution Ltd"];
+const OPP_NAMES = ["Customer Transformation","Horizon Growth Alliance","BlueWave Technologies …","Summit Financial Group","Orion Manufacturing Co.","NovaTech Solutions Inc.","PrimeLink Enterprises","EliteEdge International","Sterling Business Syste…","Titan Global Corporation","GoldenBridge Holdings …","Quantum Dynamics Ltd.","Silverline Industries Gro…","FalconTech Solutions Inc.","Evergreen Manufacturing…","Aurora Digital Systems","Crescent Banking Corp","Helios Capital Inc","Meridian Industrial Plc","Pegasus Health Co","Sapphire Telecom","Vega Energy Group","Quasar Mfg Holdings","Polaris Retail Inc","Cygnus Logistics"];
+const QADS = ["john.joe","jane.smith","priya.patel","mark.johnson","carlos.ruiz","sarah.chen","alex.wong","maria.santos"];
+
+function buildOpps(filter){
+  // Generate deterministic mock opportunities matching the screenshot pattern
+  return Array.from({length:80}, (_,i)=>{
+    const seed = (i*9301+filter.charCodeAt(0))%233280;
+    const tier = ["H","A","N"][i%3];
+    return {
+      id:`opp-${i+1}`,
+      flagged: [0,1,4,7,10,17].includes(i%20),
+      crName: CR_NAMES[i % CR_NAMES.length],
+      oppName: OPP_NAMES[i % OPP_NAMES.length],
+      oppId: 12000000 + (i*123456)%999999,
+      stage: ["3B","3A","2B","2A","1"][i%5],
+      signDate: new Date(2026, i%12, ((i*7)%28)+1),
+      tier: tier,
+      riskScore: parseFloat((2.5 + (seed%200)/100).toFixed(2)),
+      qad: QADS[i % QADS.length],
+      qadActive: i%9 !== 0,
+      revenue: Math.round(5000 + (seed%200000) + i*1500),
+      // Demographics
+      market: ["NA","EMEA","APAC","LATAM"][i%4],
+      mu: ["UKIA","DACH","ANZ","Iberia","Nordics"][i%5],
+      rde:["RDE-01","RDE-02","RDE-03"][i%3],
+      sg:["SG-A","SG-B","SG-C"][i%3]
+    };
+  });
+}
+
+// ── Manage Modal mock data (kept from before) ────
+const HISTORY = [
+  { field:"HR Review Status", old:"Not Started", new:"In Review", by:"Jane Smith (JSMITH001)", when:"May 20, 2025 · 2:32 PM", type:"workflow" },
+  { field:"QAD Assignment", old:"Mark Johnson", new:"Priya Patel", by:"Carlos Ruiz", when:"May 18, 2025 · 9:10 AM", type:"qad" },
+  { field:"PRISM Status", old:"Pending", new:"Approved", by:"Jane Smith", when:"May 15, 2025 · 11:00 AM", type:"workflow" }
+];
+const ALIGN = [
+  { dim:"Strategy & Direction", score:8, status:"Aligned" },
+  { dim:"Workforce Impact", score:6, status:"Under Review" },
+  { dim:"Financial Model", score:9, status:"Aligned" },
+  { dim:"Regulatory & Compliance", score:7, status:"Aligned" },
+  { dim:"Technology & Architecture", score:8, status:"Aligned" },
+  { dim:"Delivery Risk", score:7, status:"Aligned" },
+  { dim:"Commercial Terms", score:8, status:"Aligned" },
+  { dim:"Client Relationship", score:9, status:"Aligned" },
+  { dim:"Sustainability", score:6, status:"Under Review" }
+];
+
+const money = n => "$"+(n>=1e9?(n/1e9).toFixed(1)+"B":n>=1e6?(n/1e6).toFixed(1)+"M":(n/1e3).toFixed(0)+"K");
+
+// ── HEADER ────────────────────────────────────
+function Header({ view, onViewChange }){
+  return (
+    <header className="hdr">
+      <div className="hdr-l">
+        <span className="acn-chev">›</span>
+        <div className="hdr-title">Opportunity Portfolio Risk</div>
+      </div>
+      <div className="hdr-r">
+        <div className="view-toggle">
+          <button className={`vt-btn ${view==='ops'?'active':''}`} onClick={()=>onViewChange('ops')}>Operational Views</button>
+          <button className={`vt-btn ${view==='pra'?'active':''}`} onClick={()=>onViewChange('pra')}>PRA</button>
+        </div>
+        <button className="hdr-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+        <button className="hdr-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+        <div className="hdr-avatar">DU</div>
+      </div>
+    </header>
+  );
+}
+
+// ── CHARTS ──────────────────────────────────────
+function LineChart({ data, compact }){
+  const w=560, h=compact?140:200, pl=34, pr=10, pt=14, pb=24;
+  const cw=w-pl-pr, ch=h-pt-pb;
+  const yMin=1, yMax=3;
+  const xs = i => pl + (i/(data.length-1))*cw;
+  const ys = v => pt + (1-(v-yMin)/(yMax-yMin))*ch;
+  const portPath = data.map((d,i)=>`${i===0?'M':'L'}${xs(i)},${ys(d.port)}`).join(' ');
+  const muPath   = data.map((d,i)=>`${i===0?'M':'L'}${xs(i)},${ys(d.mu)}`).join(' ');
+  return (
+    <>
+      <svg className="chart-svg" viewBox={`0 0 ${w} ${h}`}>
+        {[1,2,3].map(v=>(<g key={v}><line x1={pl} x2={w-pr} y1={ys(v)} y2={ys(v)} className="gridline"/><text x={pl-7} y={ys(v)+3} className="axis-text" textAnchor="end">{v}</text></g>))}
+        <rect x={xs(data.length-2)} y={pt} width={xs(data.length-1)-xs(data.length-2)+10} height={ch} fill="#F5F5F8"/>
+        <path d={portPath} fill="none" stroke="var(--purple)" strokeWidth="2"/>
+        <path d={muPath} fill="none" stroke="var(--purple-mid)" strokeWidth="2"/>
+        {data.map((d,i)=><circle key={'p'+i} cx={xs(i)} cy={ys(d.port)} r="3.5" fill="var(--purple)"/>)}
+        {data.map((d,i)=><circle key={'m'+i} cx={xs(i)} cy={ys(d.mu)} r="3" fill="var(--purple-mid)"/>)}
+        {data.map((d,i)=><text key={'x'+i} x={xs(i)} y={h-6} className="axis-text" textAnchor="middle">{d.m}</text>)}
+      </svg>
+      {!compact && <div className="chart-legend">
+        <span className="leg-item"><span className="leg-line" style={{background:'var(--purple-mid)'}}/>Portfolio Risk Score</span>
+        <span className="leg-item"><span className="leg-line" style={{background:'var(--purple)'}}/>MU Risk Score</span>
+      </div>}
+    </>
+  );
+}
+
+function ScatterPlot({ data, compact }){
+  const w=440, h=compact?140:200, pl=42, pr=12, pt=12, pb=32;
+  const cw=w-pl-pr, ch=h-pt-pb;
+  const xs = v => pl + ((v-500)/(2700))*cw;
+  const ys = v => pt + (1-v/5)*ch;
+  return (
+    <svg className="chart-svg" viewBox={`0 0 ${w} ${h}`}>
+      {[1,2,3,4,5].map(v=>(<g key={v}><line x1={pl} x2={w-pr} y1={ys(v)} y2={ys(v)} className="gridline"/>{[1,3,5].includes(v) && <text x={pl-7} y={ys(v)+3} className="axis-text" textAnchor="end">{v}</text>}</g>))}
+      <line x1={pl} x2={w-pr} y1={ys(2.6)} y2={ys(2.6)} stroke="var(--purple-d)" strokeWidth="1" strokeDasharray="3,3" opacity=".5"/>
+      {data.map((d,i)=>(<circle key={i} cx={xs(d.x)} cy={ys(d.y)} r={d.withQA?4:3} fill={d.withQA?'var(--purple-d)':'var(--purple)'} opacity=".75"/>))}
+      {[1000,2000,3000].map(v=>(<text key={v} x={xs(v)} y={h-14} className="axis-text" textAnchor="middle">${v.toLocaleString()}</text>))}
+    </svg>
+  );
+}
+
+function HBar({ rows, totals, compact }){
+  return (
+    <>
+      <div className="hbar-rows" style={compact?{gap:10}:{}}>
+        {rows.map(r=>(
+          <div key={r.l} className="hbar-row">
+            <div className="hbar-label">{r.l}</div>
+            <div className="hbar-track"><div className="hbar-fill" style={{width:`${r.pct*70}%`}}/><span className="hbar-meta">{r.count.toLocaleString()}, {r.rev}</span></div>
+          </div>
+        ))}
+      </div>
+      <div className="hbar-axis"><div/><div className="hbar-axis-ticks">{[0,1500,3000,4500,6000,7500,9000].map(v=><span key={v}>{v}</span>)}</div></div>
+      {totals && (
+        <div className="hbar-totals">
+          <div style={{textAlign:'center'}}><div className="ttl-num">{totals.opps}</div><span className="ttl-lbl">Total # of Opps</span></div>
+          <div style={{textAlign:'center'}}><div className="ttl-num">{totals.rev}</div><span className="ttl-lbl">TCR ($M)</span></div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function StackedBar({ data, compact }){
+  const total = data.reduce((s,d)=>s+d.v,0);
+  return (
+    <>
+      <div className="hbar-rows" style={{padding:'12px 0 18px'}}>
+        <div className="sb-row">
+          <div className="hbar-label">Portfolio</div>
+          <div className="sb-track">
+            {data.map((d,i)=><div key={i} className="sb-seg" style={{width:`${(d.v/total)*100}%`,background:d.color,color:i===0?'#5A3A8A':'#fff'}}>{d.v >= total*0.15 ? d.v.toLocaleString() : ''}</div>)}
+            <div className="sb-total">{total.toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+      <div className="hbar-axis" style={{padding:'4px 0 8px'}}><div/><div className="hbar-axis-ticks">{[0,'2K','4K','6K','8K','10K','12K'].map(v=><span key={v}>{v}</span>)}</div></div>
+      {!compact && <div className="chart-legend" style={{marginTop:10}}>
+        {data.map(d=><span key={d.l} className="leg-item"><span className="leg-dot" style={{background:d.color,borderRadius:2,width:11,height:11}}/>{d.l}</span>)}
+      </div>}
+    </>
+  );
+}
+
+// ── DRILL-DOWN VIEW (Story 14.1) ──────────────────
+function DrillDown({ chartKey, onSelectChart, onBack, toast, onOpenFilter }){
+  const [hideCharts,setHideCharts] = useState(false);
+  const [page,setPage] = useState(1);
+  const [pageSize,setPageSize] = useState(50);
+  const [search,setSearch] = useState('');
+
+  // Title + stats per selected chart (Stories 11.1/11.2/12.1/etc.)
+  const chartMeta = {
+    'risk-revenue': { title:'Risk Tier by Revenue - High', stats:{opps:6265, tcr:'$32M', avgScore:2.1} },
+    'risk-dist':    { title:'Risk Tier Distribution: High, Above Normal & Normal', stats:{opps:9756, tcr:'$49M', avgScore:2.4} },
+    'risk-client':  { title:'High Risk Tier by Client Classification - Diamond', stats:{opps:8976, tcr:'$248M', avgScore:3.1} }
+  };
+  const meta = chartMeta[chartKey] || chartMeta['risk-revenue'];
+
+  const allOpps = useMemo(()=>buildOpps(chartKey), [chartKey]);
+  const filtered = useMemo(()=> allOpps.filter(o=>!search || o.crName.toLowerCase().includes(search.toLowerCase()) || o.oppName.toLowerCase().includes(search.toLowerCase())), [allOpps,search]);
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paged = filtered.slice((page-1)*pageSize, page*pageSize);
+  const pgNums = totalPages <= 7 ? Array.from({length:totalPages},(_,i)=>i+1) : [1,2,3,4,5,'...',totalPages];
+
+  return (
+    <div className="page">
+      <div className="crumb">
+        <a onClick={onBack}>Portfolio Overview</a>
+        <span className="crumb-sep">›</span>
+        <span className="crumb-current">Opportunity List</span>
+      </div>
+
+      {/* Charts row with Hide Charts toggle */}
+      {!hideCharts && (
+        <>
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:6}}>
+            <div className="hc-toggle">
+              <span>Hide Charts</span>
+              <div className={`switch ${!hideCharts?'on':''}`} onClick={()=>setHideCharts(true)}/>
+            </div>
+          </div>
+          <div className="grid-3">
+            <div className={`card compact ${chartKey==='risk-revenue'?'selected':''}`} onClick={()=>onSelectChart('risk-revenue')}>
+              <h3 className="card-title">Risk Tier by Revenue</h3>
+              <HBar compact rows={RISK_TIER_REV} totals={{opps:'12,895',rev:'$59M'}}/>
+            </div>
+            <div className={`card compact ${chartKey==='risk-dist'?'selected':''}`} onClick={()=>onSelectChart('risk-dist')}>
+              <h3 className="card-title">Risk Tier Distribution: High, Above Normal & Normal</h3>
+              <StackedBar compact data={DIST_DATA}/>
+            </div>
+            <div className={`card compact ${chartKey==='risk-client'?'selected':''}`} onClick={()=>onSelectChart('risk-client')}>
+              <h3 className="card-title">Risk Tier by Client Classification</h3>
+              <HBar compact rows={CLIENT_CLASS} totals={{opps:'22,001',rev:'$295M'}}/>
+            </div>
+          </div>
+        </>
+      )}
+      {hideCharts && (
+        <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+          <div className="hc-toggle">
+            <span>Hide Charts</span>
+            <div className={`switch`} onClick={()=>setHideCharts(false)}/>
+          </div>
+        </div>
+      )}
+
+      {/* Drill-Down header */}
+      <div className="dd-hdr">
+        <div>
+          <h2 className="dd-title">{meta.title}</h2>
+          <div className="dd-stats">
+            <span>Total # of Opps: <strong>{meta.stats.opps.toLocaleString()}</strong></span>
+            <span>|</span>
+            <span>TCR ($M): <strong>{meta.stats.tcr}</strong></span>
+            <span>|</span>
+            <span>Avg Risk Score: <strong>{meta.stats.avgScore}</strong></span>
+          </div>
+        </div>
+        <div className="dd-actions">
+          <div className="dd-search">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+            <input placeholder="Search" value={search} onChange={e=>{setSearch(e.target.value); setPage(1);}}/>
+          </div>
+          <button className="icon-btn" onClick={onOpenFilter} title="My Portfolio Filter">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 2h12l-5 6v5l-2-1V8L1 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+          </button>
+          <button className="icon-btn" onClick={()=>toast('Data refreshed')} title="Refresh">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7a6 6 0 0 1 10.7-3.7M13 1v3h-3M13 7a6 6 0 0 1-10.7 3.7M1 13v-3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <button className="icon-btn" onClick={()=>toast('Export started')} title="Download">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v9M3 7l4 4 4-4M1 13h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Data table */}
+      <div className="dd-table-wrap">
+        <div className="dd-table-scroll">
+          <table className="dd-table">
+            <thead>
+              <tr>
+                <th className="col-flag">Flag</th>
+                <th>Customer Relationship Name</th>
+                <th>Opportunity Name</th>
+                <th>Opportunity ID</th>
+                <th>Appropriate Stage</th>
+                <th>Expected Contract Sign Date</th>
+                <th className="col-tier">IDRA Calculated Risk Tier</th>
+                <th className="col-score">IDRA Calculated Risk Score</th>
+                <th>QAD</th>
+                <th className="col-rev" style={{paddingRight:38}}>Total Current Revenue ($k)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paged.map(o=>(
+                <tr key={o.id} onClick={()=>toast('Opportunity ' + o.oppId + ' details')}>
+                  <td className="col-flag">
+                    <span className={`flag-icon ${o.flagged?'':'inactive'}`}>{o.flagged ? '⚑' : '⚑'}</span>
+                  </td>
+                  <td><span className="truncate" title={o.crName}>{o.crName}</span></td>
+                  <td><span className="truncate" title={o.oppName}>{o.oppName}</span></td>
+                  <td style={{fontVariantNumeric:'tabular-nums'}}>{o.oppId}</td>
+                  <td>{o.stage}</td>
+                  <td>{o.signDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</td>
+                  <td className="col-tier">
+                    <span className={`tier-circle tier-${o.tier.toLowerCase()}`}>{o.tier}</span>
+                    <span className="tier-action" title="View IDRA">⟲</span>
+                  </td>
+                  <td className="col-score">{o.riskScore.toFixed(2)}</td>
+                  <td className={!o.qadActive?'qad-inactive':''} title={!o.qadActive?'QA inactive':''}>{o.qad}</td>
+                  <td className="col-rev" style={{paddingRight:38}}>${o.revenue.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* FINANCIALS vertical side label (decorative – Story 14.1 financials sub-section indicator) */}
+        <div className="fin-side">FINANCIALS</div>
+
+        {/* Pagination */}
+        <div className="pgn-bar">
+          <div className="pgn-left">
+            <span>Show</span>
+            <select className="pgn-sel" value={pageSize} onChange={e=>{setPageSize(+e.target.value); setPage(1);}}>
+              {[10,20,30,40,50].map(v=><option key={v} value={v}>{v}</option>)}
+            </select>
+            <span>Items/page</span>
+          </div>
+          <div className="pgn-mid">
+            <span>Go to page</span>
+            <select className="pgn-sel" value={page} onChange={e=>setPage(+e.target.value)}>
+              {Array.from({length:totalPages},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="pgn-ctrls">
+            <button className="pgn-btn" onClick={()=>setPage(1)} disabled={page===1}>«</button>
+            <button className="pgn-btn" onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1}>‹</button>
+            {pgNums.map((n,i)=> n==='...'
+              ? <span key={'e'+i} className="pgn-ellip">…</span>
+              : <button key={n} className={`pgn-btn ${page===n?'active':''}`} onClick={()=>setPage(n)}>{n}</button>
+            )}
+            <button className="pgn-btn" onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}>›</button>
+            <button className="pgn-btn" onClick={()=>setPage(totalPages)} disabled={page===totalPages}>»</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MY PORTFOLIO FILTER PANEL (Stories 8.1–8.14) ──────────
+function MyPortfolioFilter({ open, onClose, onApply, toast }){
+  const [view,setView] = useState('Won Deals'); // 8.4/8.5
+  const [stages,setStages] = useState(['1','2A','2B','3A','3B','3C']); // 8.6
+  const [tiers,setTiers] = useState(['High','Above Normal','Normal']); // 8.7
+  const [winProb,setWinProb] = useState('ALL'); // 8.8
+  const [revWeighted,setRevWeighted] = useState(true); // 8.9
+  const [topDeals,setTopDeals] = useState('100'); // 8.10
+  return (
+    <div className={`mpf-panel ${open?'open':''}`}>
+      <div className="mpf-hdr">
+        <h3 className="mpf-title">My Portfolio Filter</h3>
+        <button className="modal-x" style={{color:'#fff'}} onClick={onClose}><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg></button>
+      </div>
+      <div className="mpf-body">
+        <div className="mpf-grp">
+          <div className="mpf-grp-h">Portfolio · 8.2</div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">Select Portfolio</label>
+            <select className="mpf-sel"><option>-- Select Portfolio --</option><option>My EMEA Portfolio</option><option>NA Strategic Accounts</option></select>
+          </div>
+        </div>
+        <div className="mpf-grp">
+          <div className="mpf-grp-h">Filter Report By · 8.4 / 8.5</div>
+          <div className="radio-row">
+            <label><input type="radio" checked={view==='Won Deals'} onChange={()=>setView('Won Deals')}/> Won Deals</label>
+            <label><input type="radio" checked={view==='Pipeline'} onChange={()=>setView('Pipeline')}/> Pipeline</label>
+          </div>
+        </div>
+        <div className="mpf-grp">
+          <div className="mpf-grp-h">Portfolio Filters · 8.6 / 8.7 / 8.8</div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">Opportunity Stage {view!=='Pipeline' && <span style={{color:'var(--ink-4)'}}>(Pipeline only)</span>}</label>
+            <select className="mpf-sel" multiple style={{height:78}} disabled={view!=='Pipeline'} value={stages} onChange={e=>setStages(Array.from(e.target.selectedOptions).map(o=>o.value))}>
+              {['0A','1','2A','2B','3A','3B','3C'].map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">IDRA Risk Tier</label>
+            <select className="mpf-sel" multiple style={{height:64}} value={tiers} onChange={e=>setTiers(Array.from(e.target.selectedOptions).map(o=>o.value))}>
+              {['High','Above Normal','Normal'].map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">Win Probability {view!=='Pipeline' && <span style={{color:'var(--ink-4)'}}>(Pipeline only)</span>}</label>
+            <select className="mpf-sel" disabled={view!=='Pipeline'} value={winProb} onChange={e=>setWinProb(e.target.value)}>
+              {['ALL','<10%','>=10%','>=25%','>=50%','>=75%'].map(v=><option key={v}>{v}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="mpf-grp">
+          <div className="mpf-grp-h">Display Options · 8.9 / 8.10</div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">Revenue-Weighted Risk</label>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <div className={`switch ${revWeighted?'on':''}`} onClick={()=>setRevWeighted(!revWeighted)}/>
+              <span style={{fontSize:12,color:'var(--ink-2)'}}>Risk Scores Weighted by Revenue</span>
+            </div>
+          </div>
+          <div className="mpf-fld">
+            <label className="mpf-lbl">View Risky Deals – Top Deals</label>
+            <select className="mpf-sel" value={topDeals} onChange={e=>setTopDeals(e.target.value)}>
+              <option>All</option><option>25</option><option>50</option><option>100</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div className="mpf-foot">
+        <button className="btn" onClick={()=>{toast('Filters cleared');}}>Clear</button>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={()=>{onApply(); onClose(); toast('Filters applied');}}>Apply</button>
+      </div>
+    </div>
+  );
+}
+
+// ── PRA DASHBOARD ─────────────────────────────
+function PraDashboard({ onDrillDown, onOpenFilter }){
+  return (
+    <div className="page">
+      <div className="page-hdr">
+        <h1 className="page-title">Portfolio Risk (O-IDRA)</h1>
+        <div className="filt">
+          <span className="filt-lbl">Show</span>
+          <button className="filt-pill">Quarterly <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5"/></svg></button>
+          <button className="filt-pill">Portfolio <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5"/></svg></button>
+          <button className="filt-pill">Revenue Range: &gt;$1M <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5"/></svg></button>
+          <button className="filt-icon-btn" onClick={onOpenFilter} title="My Portfolio Filter"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 2h12l-5 6v5l-2-1V8L1 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg></button>
+        </div>
+      </div>
+      <div className="grid-2">
+        <div className="card">
+          <h3 className="card-title">Risk Score Trend - Won Deals Weighted by Revenue</h3>
+          <div className="y-axis-label">Score</div>
+          <LineChart data={TREND_DATA}/>
+        </div>
+        <div className="card">
+          <h3 className="card-title">Risky Deals - Scatterplot</h3>
+          <div className="scatter-row">
+            <div><div className="y-axis-label">Score</div><ScatterPlot data={SCATTER_DATA}/></div>
+            <div className="stats-pane">
+              <div className="stat-row"><span className="stat-label">Avg. IDRA Risk Score</span><span className="stat-value">{PORTFOLIO_KPI.avgRisk}</span></div>
+              <div className="stat-row"><span className="stat-label">Total Revenue</span><span className="stat-value">{PORTFOLIO_KPI.totalRev}</span></div>
+              <div className="stat-row"><span className="stat-label"># of Opp</span><span className="stat-value">{PORTFOLIO_KPI.numOpps.toLocaleString()}</span></div>
+              <div className="stat-row"><span className="stat-label">Total SC%<span className="stat-info">i</span></span><span className="stat-value">{PORTFOLIO_KPI.scPct}</span></div>
+              <div className="stat-row"><span className="stat-label">Total CCI%<span className="stat-info">i</span></span><span className="stat-value">{PORTFOLIO_KPI.ccPct}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid-3">
+        <div className="card" onClick={()=>onDrillDown('risk-revenue')}>
+          <h3 className="card-title">Risk Tier by Revenue</h3>
+          <HBar rows={RISK_TIER_REV} totals={{opps:'12,895',rev:'$59M'}}/>
+        </div>
+        <div className="card" onClick={()=>onDrillDown('risk-dist')}>
+          <h3 className="card-title">Risk Tier Distribution: High, Above Normal & Normal</h3>
+          <StackedBar data={DIST_DATA}/>
+        </div>
+        <div className="card" onClick={()=>onDrillDown('risk-client')}>
+          <h3 className="card-title">Risk Tier by Client Classification</h3>
+          <HBar rows={CLIENT_CLASS} totals={{opps:'22,001',rev:'$295M'}}/>
+        </div>
+      </div>
+      <p style={{textAlign:'center',fontSize:11,color:'var(--ink-3)',marginTop:12}}>Click any chart card above to drill into the opportunity list ↓</p>
+    </div>
+  );
+}
+
+// ── OPERATIONAL VIEWS (kept) ──────────────────
+const CUSTOM_VIEWS = [
+  { id:"cv1", name:"My EMEA Pipeline", desc:"All pipeline deals in EMEA region", fav:true, shared:true, count:24, tcr:480_000_000, risk:6.4, shareCount:3 },
+  { id:"cv2", name:"High Risk Q2", desc:"Tier 1 & 2 risk, closing this quarter", fav:true, shared:false, count:11, tcr:215_000_000, risk:8.1 },
+  { id:"cv3", name:"Financial Services Won", desc:"Won deals – FS industry", fav:false, isNew:true, shared:false, count:18, tcr:320_000_000, risk:4.9 }
+];
+const STANDARD_VIEWS = [
+  { id:"sv1", name:"All Active Opportunities", desc:"Won + Pipeline meeting inclusion criteria", count:87, tcr:2_100_000_000, risk:5.8 },
+  { id:"sv2", name:"Won Deals", desc:"Contracted, active engagements", count:42, tcr:1_050_000_000, risk:5.1 },
+  { id:"sv3", name:"Pipeline Deals", desc:"Opportunities not yet contracted", count:45, tcr:1_050_000_000, risk:6.4 },
+  { id:"sv4", name:"Workforce Displacement", desc:"Deals with confirmed displacement", fav:true, count:29, tcr:730_000_000, risk:7.2 }
+];
+
+function ViewTile({ tile, onClick, onFav }){
+  return (
+    <div className={`tile ${tile.fav?'fav':''}`} onClick={()=>onClick(tile)}>
+      {(tile.isNew||tile.shared) && (<div className="badges">{tile.isNew && <span className="bdg bdg-new">New</span>}{tile.shared && <span className="bdg bdg-shared">Shared</span>}</div>)}
+      <div className="tile-top">
+        <button className={`tile-star ${tile.fav?'on':''}`} onClick={e=>{e.stopPropagation();onFav(tile.id)}}><svg width="16" height="16" viewBox="0 0 16 16" fill={tile.fav?'currentColor':'none'} stroke="currentColor" strokeWidth="1.3"><path d="M8 2.5l1.546 3.13 3.454.502-2.5 2.435.59 3.433L8 10.25l-3.09 1.75.59-3.433L3 6.132l3.454-.502L8 2.5z"/></svg></button>
+        <div className="tile-name">{tile.name}</div>
+      </div>
+      {tile.desc && <p className="tile-desc">{tile.desc}</p>}
+      <div className="tile-mtr">
+        <div className="mtr"><span className="mtr-v">{tile.count}</span><span className="mtr-l">Opps</span></div>
+        <div className="mtr"><span className="mtr-v">{money(tile.tcr)}</span><span className="mtr-l">TCR</span></div>
+        <div className="mtr"><span className="mtr-v">{tile.risk.toFixed(1)}</span><span className="mtr-l">Avg Risk</span></div>
+      </div>
+    </div>
+  );
+}
+
+function OperationalViews({ toast }){
+  const [favs,setFavs] = useState({cv1:true,cv2:true,sv4:true});
+  const toggleFav = id => { setFavs(f=>({...f,[id]:!f[id]})); toast(favs[id]?'Removed from favorites':'Added to favorites'); };
+  return (
+    <div className="page">
+      <div className="page-hdr"><h1 className="page-title">Operational Views</h1></div>
+      <div className="toolbar">
+        <div className="search-wrap"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg><input placeholder="Search views..."/></div>
+        <button className="btn">⚙ Advanced Filter</button>
+        <button className="btn btn-primary">+ Create My View</button>
+      </div>
+      <div className="sec"><div className="sec-hdr"><svg className="sec-arrow open" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="sec-title">My Views (Custom)</span><span className="sec-count">{CUSTOM_VIEWS.length}</span></div>
+        <div className="tiles">{CUSTOM_VIEWS.map(t=><ViewTile key={t.id} tile={{...t,fav:!!favs[t.id]}} onClick={()=>toast('Opening '+t.name)} onFav={toggleFav}/>)}</div>
+      </div>
+      <div className="sec"><div className="sec-hdr"><svg className="sec-arrow open" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="sec-title">Standard Views</span><span className="sec-count">{STANDARD_VIEWS.length}</span></div>
+        <div className="tiles">{STANDARD_VIEWS.map(t=><ViewTile key={t.id} tile={{...t,fav:!!favs[t.id]}} onClick={()=>toast('Opening '+t.name)} onFav={toggleFav}/>)}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── FOOTER ────────────────────────────────────
+function Footer(){
+  return (
+    <footer className="ftr">
+      <div className="ftr-l">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 14V8M6 14V4M10 14V10M14 14V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+        <span>Use of this tool is monitored to understand how often the tool is accessed and which features are used. The tool usage data may be shared with Quality leadership for tool improvement purposes. By using this tool, you agree to the collection and use of data for this purpose.</span>
+      </div>
+      <div className="ftr-r">
+        <div>© 2005-2026 Accenture. All rights reserved. Accenture Restricted. For internal use only.</div>
+        <div className="ftr-links"><a href="#">Cookie Policy</a><a href="#">Terms of Use</a><a href="#">Privacy Policy</a></div>
+      </div>
+    </footer>
+  );
+}
+
+// ── APP ──────────────────────────────────────
+function App(){
+  const [view,setView] = useState('pra'); // pra | ops
+  const [praScreen,setPraScreen] = useState('dashboard'); // dashboard | drill
+  const [drillChart,setDrillChart] = useState('risk-revenue');
+  const [filterOpen,setFilterOpen] = useState(false);
+  const [toastMsg,setToastMsg] = useState('');
+  const toast = m => { setToastMsg(m); setTimeout(()=>setToastMsg(''),2200); };
+
+  const onDrillDown = chart => { setDrillChart(chart); setPraScreen('drill'); };
+  const onViewChange = v => { setView(v); setPraScreen('dashboard'); };
+
+  return (
+    <>
+      <Header view={view} onViewChange={onViewChange}/>
+      {view==='pra' && praScreen==='dashboard' && <PraDashboard onDrillDown={onDrillDown} onOpenFilter={()=>setFilterOpen(true)}/>}
+      {view==='pra' && praScreen==='drill' && <DrillDown chartKey={drillChart} onSelectChart={setDrillChart} onBack={()=>setPraScreen('dashboard')} toast={toast} onOpenFilter={()=>setFilterOpen(true)}/>}
+      {view==='ops' && <OperationalViews toast={toast}/>}
+      <MyPortfolioFilter open={filterOpen} onClose={()=>setFilterOpen(false)} onApply={()=>{}} toast={toast}/>
+      {toastMsg && <div className="toast">{toastMsg}</div>}
+      <Footer/>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
